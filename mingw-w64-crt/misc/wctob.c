@@ -14,16 +14,22 @@
 #include <windows.h>
 
 /* Return just the first byte after translating to multibyte.  */
-int wctob (wint_t wc )
+int wctob (wint_t wc)
 {
-    wchar_t w = wc;
-    char c;
-    int invalid_char = 0;
-    if (!WideCharToMultiByte (___lc_codepage_func(),
-			      0 /* Is this correct flag? */,
-			      &w, 1, &c, 1, NULL, &invalid_char)
-	 || invalid_char)
-      return EOF;
+  unsigned cp = ___lc_codepage_func();
 
-    return (unsigned char) c;
+  /* "C" locale */
+  if (cp == 0)
+    return wc <= 0xFF ? wc : EOF;
+
+  wchar_t w = wc;
+  char c;
+  /* Will be set to 1 if conversion failed */
+  int failed = 0;
+
+  /* Do not use WC_NO_BEST_FIT_CHARS, CRT performs best-fit conversion */
+  if (!WideCharToMultiByte (cp, 0, &w, 1, &c, 1, NULL, &failed) || failed)
+    return EOF;
+
+  return (unsigned char) c;
 }

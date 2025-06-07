@@ -15,14 +15,18 @@ wint_t btowc (int c)
 {
   if (c == EOF)
     return (WEOF);
-  else
-    {
-      unsigned char ch = c;
-      wchar_t wc = WEOF;
-      if (!MultiByteToWideChar (___lc_codepage_func(), MB_ERR_INVALID_CHARS,
-                                (char*)&ch, 1, &wc, 1))
-        return WEOF;
 
-      return wc;
-    }
+  unsigned cp = ___lc_codepage_func();
+
+  /* "C" locale */
+  if (cp == 0)
+    return (unsigned char) c;
+
+  unsigned char ch = c;
+  wchar_t wc = WEOF;
+
+  if (!MultiByteToWideChar (cp, MB_ERR_INVALID_CHARS, (char*)&ch, 1, &wc, 1))
+    return WEOF;
+
+  return wc;
 }
