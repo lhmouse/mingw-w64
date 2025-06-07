@@ -59,13 +59,13 @@ EXPORTS
 ;__Wcrtomb_lk
 ;_Xbig
 
-btowc
+; btowc
 mbrlen
 mbrtowc
 mbsrtowcs
 towctrans
 wcrtomb
 wcsrtombs
-wctob
+; wctob
 wctrans
 wctype

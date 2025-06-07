@@ -1736,7 +1736,7 @@ atoi
 atol
 bsearch
 bsearch_s
-btowc
+; btowc
 calloc
 ceil
 ceilf
@@ -1978,7 +1978,7 @@ wcstombs
 wcstombs_s
 wcstoul
 wcsxfrm
-wctob
+; wctob
 wctomb
 wctomb_s
 wmemcpy_s

@@ -2293,13 +2293,13 @@ _Toupper
 _Wcrtomb
 _Xbig
 __Wcrtomb_lk
-btowc
+; btowc
 mbrlen
 mbrtowc
 mbsrtowcs
 towctrans
 wcrtomb
 wcsrtombs
-wctob
+; wctob
 wctrans
 wctype

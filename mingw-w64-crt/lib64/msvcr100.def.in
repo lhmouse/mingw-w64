@@ -1612,7 +1612,7 @@ atoi
 atol
 bsearch
 bsearch_s
-btowc
+; btowc
 calloc
 ceil DATA
 ceilf DATA
@@ -1854,7 +1854,7 @@ wcstombs
 wcstombs_s
 wcstoul
 wcsxfrm
-wctob
+; wctob
 wctomb
 wctomb_s
 wmemcpy_s
