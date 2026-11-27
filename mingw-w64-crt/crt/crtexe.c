@@ -28,8 +28,6 @@
 
 #include "seh_signal_dispatcher.h"
 
-extern IMAGE_DOS_HEADER __ImageBase;
-
 int __cdecl _tmain(int, _TCHAR**, _TCHAR**);
 int *__cdecl __p__commode(void);
 int __cdecl _configthreadlocale(int);
@@ -46,8 +44,6 @@ extern int _fmode;
 extern int _commode;
 extern int __globallocalestatus;
 
-static int __cdecl check_managed_app (void);
-
 extern _PIFV __xi_a[];
 extern _PIFV __xi_z[];
 extern _PVFV __xc_a[];
@@ -63,14 +59,7 @@ void (__cdecl *const __mingw_register_thread_local_exe_atexit_callback_ptr)(void
 
 extern int __mingw_app_type;
 
-static int argc;
 extern void __main(void);
-static _TCHAR **argv;
-static _TCHAR **envp;
-
-static int managedapp;
-static int has_cctor = 0;
-
 extern void _pei386_runtime_relocator (void);
 static int duplicate_ppstrings (int ac, _TCHAR ***av);
 
@@ -128,22 +117,22 @@ safe_flush (void)
   fflush (NULL);
 }
 
-static int __tmainCRTStartup (void);
+static __declspec(noinline) __MINGW_ATTRIB_NORETURN void __tmainCRTStartup (void);
 
-int WinMainCRTStartup (void);
+__MINGW_ATTRIB_NORETURN int WinMainCRTStartup (void);
 __attribute__((used)) /* required due to GNU LD bug: https://sourceware.org/bugzilla/show_bug.cgi?id=30300 */
-int WinMainCRTStartup (void)
+__MINGW_ATTRIB_NORETURN int WinMainCRTStartup (void)
 {
   __mingw_app_type = 1;
-  return __tmainCRTStartup ();
+  __tmainCRTStartup ();
 }
 
-int mainCRTStartup (void);
+__MINGW_ATTRIB_NORETURN int mainCRTStartup (void);
 __attribute__((used)) /* required due to GNU LD bug: https://sourceware.org/bugzilla/show_bug.cgi?id=30300 */
-int mainCRTStartup (void)
+__MINGW_ATTRIB_NORETURN int mainCRTStartup (void)
 {
   __mingw_app_type = 0;
-  return __tmainCRTStartup ();
+  __tmainCRTStartup ();
 }
 
 static
@@ -152,7 +141,7 @@ static
    opts in main or in functions called from main.  */
 __attribute__((force_align_arg_pointer))
 #endif
-__declspec(noinline) int
+__declspec(noinline) __MINGW_ATTRIB_NORETURN void
 __tmainCRTStartup (void)
 {
     /* Registration of SEH error handler __mingw_SEH_signal_dispatcher used for
@@ -169,28 +158,11 @@ __tmainCRTStartup (void)
     asm volatile (".seh_handler %c0, " ASM_SEH_EXCEPT :: "i" (__mingw_SEH_signal_dispatcher));
 #endif
 
-    void *lock_free = NULL;
-    void *fiberid = ((PNT_TIB)NtCurrentTeb())->StackBase;
-    BOOL nested = FALSE;
+    int argc;
+    _TCHAR **argv;
+    _TCHAR **envp;
     _startupinfo startinfo;
     int ret = 0;
-    while((lock_free = InterlockedCompareExchangePointer (&__native_startup_lock,
-							  fiberid, NULL)) != 0)
-      {
-	if (lock_free == fiberid)
-	  {
-	    nested = TRUE;
-	    break;
-	  }
-	Sleep(1000);
-      }
-    if (__native_startup_state == __initializing)
-      {
-	_amsg_exit (31);
-      }
-    else if (__native_startup_state == __uninitialized)
-      {
-	__native_startup_state = __initializing;
 
 	/* Before the UCRT stderr could be opened in full buffering
 	 * mode, for example when output goes to a pipe.
@@ -213,7 +185,6 @@ __tmainCRTStartup (void)
 	_set_invalid_parameter_handler (__mingw_invalidParameterHandler);
 	_fpreset ();
 
-	managedapp = check_managed_app ();
 	if (__mingw_app_type)
 	  __set_app_type (_GUI_APP);
 	else
@@ -256,13 +227,6 @@ __tmainCRTStartup (void)
 	_initterm (__xc_a, __xc_z);
 	__main (); /* C++ initialization. */
 
-	__native_startup_state = __initialized;
-      }
-    else
-      has_cctor = 1;
-    if (! nested)
-      (VOID)InterlockedExchangePointer (&__native_startup_lock, NULL);
-
     if (__dyn_tls_init_callback != NULL)
       __dyn_tls_init_callback (NULL, DLL_THREAD_ATTACH, NULL);
 
@@ -275,48 +239,11 @@ __tmainCRTStartup (void)
     __initenv = envp;
 #endif
     ret = _tmain (argc, argv, envp);
-    if (!managedapp)
-      exit (ret);
-
-    if (has_cctor == 0)
-      _cexit ();
-
-#if defined(__i386__)
+    exit (ret);
+/* No longer reached, kept for documentation purpose. */
+#if 0 /* defined(__i386__) */
   __writefsdword (0, (DWORD)exception_record.Next); /* dynamically unregister SEH error handler */
 #endif
-  return ret;
-}
-
-static int __cdecl
-check_managed_app (void)
-{
-  PIMAGE_DOS_HEADER pDOSHeader;
-  PIMAGE_NT_HEADERS pPEHeader;
-  PIMAGE_OPTIONAL_HEADER32 pNTHeader32;
-  PIMAGE_OPTIONAL_HEADER64 pNTHeader64;
-
-  pDOSHeader = (PIMAGE_DOS_HEADER) &__ImageBase;
-  if (pDOSHeader->e_magic != IMAGE_DOS_SIGNATURE)
-    return 0;
-
-  pPEHeader = (PIMAGE_NT_HEADERS)((char *)pDOSHeader + pDOSHeader->e_lfanew);
-  if (pPEHeader->Signature != IMAGE_NT_SIGNATURE)
-    return 0;
-
-  pNTHeader32 = (PIMAGE_OPTIONAL_HEADER32) &pPEHeader->OptionalHeader;
-  switch (pNTHeader32->Magic)
-    {
-    case IMAGE_NT_OPTIONAL_HDR32_MAGIC:
-      if (pNTHeader32->NumberOfRvaAndSizes <= IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR)
-	return 0;
-      return !! pNTHeader32->DataDirectory[IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR].VirtualAddress;
-    case IMAGE_NT_OPTIONAL_HDR64_MAGIC:
-      pNTHeader64 = (PIMAGE_OPTIONAL_HEADER64)pNTHeader32;
-      if (pNTHeader64->NumberOfRvaAndSizes <= IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR)
-	return 0;
-      return !! pNTHeader64->DataDirectory[IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR].VirtualAddress;
-    }
-  return 0;
 }
 
 static int duplicate_ppstrings (int ac, _TCHAR ***av)
